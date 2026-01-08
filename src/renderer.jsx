@@ -1,15 +1,25 @@
-import '@mantine/core/styles.css';
-import { MantineProvider } from '@mantine/core';
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
 
-import { createRoot } from 'react-dom/client';
+import "@mantine/core/styles.css";
+import "@mantine/notifications/styles.css";
 
-// render full app frame
-const App = () => {
-  return (
-      <h1>Hello, Electron with React!</h1>
-  );
-}
+import { MantineProvider } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
+import { ModalsProvider } from "@mantine/modals";
 
-const container = document.getElementById('root');
+import AppFrame from "./components/layout/AppFrame.jsx";
+
+const container = document.getElementById("root");
 const root = createRoot(container);
-root.render(<MantineProvider><App /></MantineProvider>);
+
+root.render(
+  <StrictMode>
+    <MantineProvider defaultColorScheme="light">
+      <Notifications />
+      <ModalsProvider>
+        <AppFrame />
+      </ModalsProvider>
+    </MantineProvider>
+  </StrictMode>
+);
