@@ -1,3 +1,7 @@
+import '@mantine/core/styles.css';
+
+import { MantineProvider } from '@mantine/core';
+
 import { createRoot } from 'react-dom/client';
 
 const App = () => {
@@ -5,6 +9,7 @@ const App = () => {
       <h1>Hello, Electron with React!</h1>
   );
 }
+
 const container = document.getElementById('root');
 const root = createRoot(container);
-root.render(<App />);
+root.render(<MantineProvider><App /></MantineProvider>);
