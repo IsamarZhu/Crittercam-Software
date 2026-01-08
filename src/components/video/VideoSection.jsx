@@ -1,0 +1,1 @@
+// bordered box with video + bottom control strip

@@ -1,0 +1,1 @@
+// vertical stack of main content area

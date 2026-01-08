@@ -1,0 +1,1 @@
+// info box in corner with shortcuts/help

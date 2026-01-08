@@ -1,0 +1,1 @@
+// bordered panel with audio display + small toolbar
