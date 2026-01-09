@@ -1,6 +1,8 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import started from 'electron-squirrel-startup';
+import fs from 'node:fs';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -8,12 +10,18 @@ if (started) {
 }
 
 const createWindow = () => {
+  const isDev = Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      // Allow local file playback when renderer is served via http (dev server)
+      // avoid file access issues
+      webSecurity: !isDev,
+      allowRunningInsecureContent: isDev,
+      allowFileAccessFromFileUrls: true,
     },
   });
 
@@ -27,6 +35,55 @@ const createWindow = () => {
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
 };
+
+// ipcMain handles messages from renderer process
+
+// IPC handlers for file operations
+ipcMain.handle('select-video', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [
+      { name: 'MP4', extensions: ['mp4'] },
+      { name: 'All Files', extensions: ['*'] } // add csv or other types when know input format
+    ]
+  });
+
+  if (result.canceled) {
+    return null;
+  }
+
+  const filePath = result.filePaths[0];
+  
+  // Verify file exists and is an mp4
+  // redundant since import modal also checks, but good for robustness across layers
+  if (!filePath.endsWith('.mp4')) {
+    throw new Error('Selected file must be an .mp4 file');
+  }
+
+  if (!fs.existsSync(filePath)) {
+    throw new Error('Selected file does not exist');
+  }
+
+  return filePath;
+});
+
+ipcMain.handle('get-video-metadata', async (event, filePath) => {
+  try {
+    const stats = fs.statSync(filePath);
+    const fileName = path.basename(filePath);
+    
+    // TODO what other metadata to extract?
+    return {
+      path: filePath,
+      fileUrl: pathToFileURL(filePath).toString(),
+      fileName: fileName,
+      fileSize: stats.size,
+      lastModified: stats.mtime,
+    };
+  } catch (error) {
+    throw new Error(`Failed to read video metadata: ${error.message}`);
+  }
+});
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

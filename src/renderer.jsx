@@ -16,7 +16,7 @@ const root = createRoot(container);
 root.render(
   <StrictMode>
     <MantineProvider defaultColorScheme="light">
-      <Notifications />
+      <Notifications position="top-right" />
       <ModalsProvider>
         <AppFrame />
       </ModalsProvider>
