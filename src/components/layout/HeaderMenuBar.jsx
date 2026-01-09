@@ -10,7 +10,7 @@ function MenuButton({ label }) {
     );
 }
 
-export default function HeaderMenuBar() {
+export default function HeaderMenuBar({ onImportClick }) {
     return (
         <Group h="100%" px="md" justify="space-between">
             <Group gap="xs">
@@ -21,8 +21,7 @@ export default function HeaderMenuBar() {
                         </div>
                     </Menu.Target>
                     <Menu.Dropdown>
-                        <Menu.Item>Open deployment folder…</Menu.Item>
-                        <Menu.Item>Use high-res video</Menu.Item>
+                        <Menu.Item onClick={onImportClick}>Import video…</Menu.Item>
                         <Menu.Divider />
                         <Menu.Item>Export graph snapshot…</Menu.Item>
                         <Menu.Item>Export POIs CSV…</Menu.Item>
