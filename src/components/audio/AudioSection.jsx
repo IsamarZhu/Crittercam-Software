@@ -15,14 +15,15 @@ export default function AudioSection({ collapsed, onToggleCollapsed }) {
 
     return (
         <Paper
-            withBorder
             radius="md"
             p="xs"
             style={{
                 height: "100%",
                 paddingBottom: 5,
+                position: "relative",
             }}
         >
+            <Paper withBorder p="xs" radius="md" style={{ height: "100%" }}>
             <Box
                 style={{
                     height: "100%",
@@ -45,18 +46,6 @@ export default function AudioSection({ collapsed, onToggleCollapsed }) {
                         />
                     )}
                     {collapsed && <Box />}
-
-                    <Group gap="xs">
-                        <Tooltip label={collapsed ? "Expand audio panel" : "Collapse audio panel"} withArrow>
-                            <ActionIcon
-                                variant="subtle"
-                                onClick={onToggleCollapsed}
-                                aria-label={collapsed ? "Expand audio panel" : "Collapse audio panel"}
-                            >
-                                {collapsed ? <IconChevronDown size={18} /> : <IconChevronUp size={18} />}
-                            </ActionIcon>
-                        </Tooltip>
-                    </Group>
                 </Group>
 
                 {!collapsed && ( // display collapses
@@ -74,6 +63,24 @@ export default function AudioSection({ collapsed, onToggleCollapsed }) {
                     </Box>
                 )}
             </Box>
+            </Paper>
+
+            {/* Collapse button overlay */}
+            <Tooltip label={collapsed ? "Expand audio panel" : "Collapse audio panel"} withArrow>
+                <ActionIcon
+                    variant="subtle"
+                    onClick={onToggleCollapsed}
+                    aria-label={collapsed ? "Expand audio panel" : "Collapse audio panel"}
+                    style={{
+                        position: "absolute", // use absolute to overlay over paper padding and to prevent arrow shifts when collapsing
+                        top: 9,
+                        right: 9,
+                        zIndex: 10,
+                    }}
+                >
+                    {collapsed ? <IconChevronDown size={18} /> : <IconChevronUp size={18} />}
+                </ActionIcon>
+            </Tooltip>
         </Paper>
     );
 }

@@ -9,13 +9,15 @@ import ActionBar from "../actions/ActionBar";
 
 export default function MainColumn() {
 
+    // state for audio panel collapsed, lifted
     const [audioCollapsed, setAudioCollapsed] = useState(false);
+
     return (
         <Box
             style={{
                 height: "100%",
                 display: "grid",
-                gridTemplateRows: audioCollapsed ? "50% 35px 1fr 50px" : "50% 15% 1fr 50px",
+                gridTemplateRows: audioCollapsed ? "50% 30px 1fr 50px" : "50% 15% 1fr 50px",
                 gap: 0,
             }}
         >
