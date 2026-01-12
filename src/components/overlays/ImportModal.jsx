@@ -4,35 +4,24 @@ import { notifications } from '@mantine/notifications';
 import { useVideo } from '../../contexts/VideoContext';
 
 export default function ImportModal({ opened, onClose }) {
-  const { loadVideo } = useVideo();
+  const { loadVideoFolder } = useVideo();
   const [selectedResolution, setSelectedResolution] = useState('high'); // default high res
   const [isLoading, setIsLoading] = useState(false); // TODO lock UI during loading
 
-  const handleSelectVideo = async () => {
+  const handleSelectFolder = async () => {
     try {
       setIsLoading(true);
-      const filePath = await window.electronAPI.selectVideo();
+      const folderData = await window.electronAPI.selectVideoFolder();
 
-      if (!filePath) {
+      if (!folderData) {
         return; // user cancelled
       }
 
-      // verify it's an mp4
-      // TODO add other acceptable file paths
-      if (!filePath.endsWith('.mp4')) {
-        notifications.show({
-          title: 'Invalid file',
-          message: 'Selected file must be an .mp4',
-          color: 'red',
-        });
-        return;
-      }
-
-      await loadVideo(filePath, selectedResolution);
+      await loadVideoFolder(folderData, selectedResolution);
 
       notifications.show({
-        title: 'Video loaded',
-        message: 'Video imported successfully',
+        title: 'Folder imported',
+        message: 'Videos loaded successfully',
         color: 'green',
       });
 
@@ -41,11 +30,11 @@ export default function ImportModal({ opened, onClose }) {
     } catch (err) {
       notifications.show({
         title: 'Import failed',
-        message: err.message || 'Failed to load video',
+        message: err.message || 'Failed to load videos',
         color: 'red',
       });
 
-      console.error('Import error:', err);
+      console.error('Folder import error:', err);
 
     } finally {
       setIsLoading(false); // unlock UI after loading
@@ -56,13 +45,12 @@ export default function ImportModal({ opened, onClose }) {
     <Modal
       opened={opened}
       onClose={onClose}
-      title="Import Video"
+      title="Import Videos"
       centered
       size="sm"
     >
       <Stack gap="md">
-        <div>
-          <Text size="sm" fw={500} mb="xs">
+        {/* <Text size="sm" fw={500} mb="xs"> // TODO resolution selection
             Select video resolution: 
           </Text>
           <SegmentedControl
@@ -78,15 +66,17 @@ export default function ImportModal({ opened, onClose }) {
             {selectedResolution === 'low'
               ? 'Low res explanation low res explanation'
               : 'High res explanation high res explanation'}
-          </Text>
-        </div>
+          </Text> */}
+        <Text size="sm" c="dimmed">
+          Folder import expects names like Day1Whale1_YYYYMMDD_HHMMSS with a "video" subfolder.
+        </Text>
 
         <Group justify="flex-end">
           <Button variant="subtle" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button onClick={handleSelectVideo} loading={isLoading}>
-            Select Video
+          <Button onClick={handleSelectFolder} loading={isLoading}>
+            Select Folder
           </Button>
         </Group>
       </Stack>

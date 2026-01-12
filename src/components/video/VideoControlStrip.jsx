@@ -1,6 +1,6 @@
 // ui buttons and controls
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Group, ActionIcon, Slider, Text, Box, Popover } from '@mantine/core';
 import { useMove } from '@mantine/hooks';
 import {
@@ -31,38 +31,47 @@ export default function VideoControlStrip() {
   const [volumePopoverOpened, setVolumePopoverOpened] = useState(false);
 
   // https://mantine.dev/hooks/use-move/#vertical-slider
-  const { ref: volumeRef } = useMove(({ y }) => setVolume(1 - y)); 
-  
+  const { ref: volumeRef } = useMove(({ y }) => setVolume(1 - y));
+
   const {
-    videoFile,
-    currentTime,
+    activeVideo,
+    currentRelativeTime,
     videoDuration,
     isPlaying,
     playbackRate,
     volume,
-    setCurrentTime,
+    globalStartMs,
+    globalEndMs,
+    globalDurationSec,
+    globalOffsetSec,
+    setGlobalTimeInVideo,
     setIsPlaying,
     setPlaybackRate,
     setVolume,
   } = useVideo(); // hook into video context
 
+  const hasTimeline = globalStartMs !== null && globalEndMs !== null && globalDurationSec > 0;
+  const hasActiveVideo = Boolean(activeVideo);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (!videoFile) return;
+      if (!hasTimeline) return;
 
       switch (e.code) {
         case 'Space': // play/pause
           e.preventDefault();
-          setIsPlaying((prev) => !prev);
+          if (hasActiveVideo) {
+            setIsPlaying((prev) => !prev);
+          }
           break;
         case 'ArrowLeft': // rewind 10s
           e.preventDefault();
-          setCurrentTime(Math.max(0, currentTime - 10));
+          setGlobalTimeInVideo(globalStartMs + (globalOffsetSec - 10) * 1000);
           break;
         case 'ArrowRight': // forward 10s
           e.preventDefault();
-          setCurrentTime(Math.min(videoDuration, currentTime + 10));
+          setGlobalTimeInVideo(globalStartMs + (globalOffsetSec + 10) * 1000);
           break;
         case 'ArrowUp': // increase speed
           e.preventDefault();
@@ -79,10 +88,9 @@ export default function VideoControlStrip() {
 
     window.addEventListener('keydown', handleKeyDown); // any key press triggers handler
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasTimeline, hasActiveVideo, globalStartMs, globalOffsetSec, setGlobalTimeInVideo, setPlaybackRate, setIsPlaying]);
 
-  }, [videoFile, currentTime, videoDuration, setCurrentTime, setIsPlaying, setPlaybackRate]);
-
-  if (!videoFile) { // no video loaded, show placeholder text
+  if (!hasTimeline) { // no videos loaded at all
     return (
       <Group
         justify="center"
@@ -95,8 +103,26 @@ export default function VideoControlStrip() {
         }}
       >
         <Text size="sm" c="dimmed">
-          Use File → Import video…
+          Use File → Import folder…
         </Text>
+      </Group>
+    );
+  }
+
+  if (!hasActiveVideo) { // has timeline but no active video at current time
+    return (
+      <Group
+        justify="center"
+        px="sm"
+        py={4}
+        style={{
+          minHeight: '36px',
+          alignItems: 'center',
+          backgroundColor: '#f1f3f5',
+          border: '1px solid #dee2e6',
+        }}
+      >
+        {/* Empty grey bar */}
       </Group>
     );
   }
@@ -119,16 +145,18 @@ export default function VideoControlStrip() {
         <Group gap={0}>
           <ActionIcon
             variant="subtle"
-            onClick={() => setCurrentTime(Math.max(0, currentTime - 10))}
+            onClick={() => setGlobalTimeInVideo(globalStartMs + (globalOffsetSec - 10) * 1000)}
             title="Back 10s (←)"
+            disabled={!hasActiveVideo}
           >
             <IconPlayerSkipBack size={18} />
           </ActionIcon>
 
           <ActionIcon
             variant="subtle"
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={() => hasActiveVideo && setIsPlaying(!isPlaying)}
             title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            disabled={!hasActiveVideo}
           >
             {/* can also be toggled with spacebar */}
             {isPlaying ? <IconPlayerPause size={18} /> : <IconPlayerPlay size={18} />}
@@ -136,21 +164,25 @@ export default function VideoControlStrip() {
 
           <ActionIcon
             variant="subtle"
-            onClick={() => setCurrentTime(Math.min(videoDuration, currentTime + 10))}
+            onClick={() => setGlobalTimeInVideo(globalStartMs + (globalOffsetSec + 10) * 1000)}
             title="Forward 10s (→)"
+            disabled={!hasActiveVideo}
           >
             <IconPlayerSkipForward size={18} />
           </ActionIcon>
         </Group>
 
         <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-          {/* current time / total duration */}
-          {formatTime(currentTime)} / {formatTime(videoDuration)}
+          {/* current position in active video / video duration */}
+          {hasActiveVideo
+            ? `${formatTime(currentRelativeTime)} / ${formatTime(videoDuration)}`
+            : `${formatTime(globalOffsetSec)} / ${formatTime(globalDurationSec)}`
+          }
         </Text>
 
         <Slider
-          value={currentTime}
-          onChange={setCurrentTime}
+          value={currentRelativeTime}
+          onChange={(val) => setGlobalTimeInVideo(activeVideo.startMs + val * 1000)}
           max={videoDuration}
           min={0}
           step={0.1} // TODO step size ok?
@@ -160,20 +192,20 @@ export default function VideoControlStrip() {
 
       {/* in the middle - video filename */}
       <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-        {videoFile.fileName}
+        {activeVideo.fileName}
       </Text>
 
       {/* on the right - speed and volume buttons*/}
       <Group gap="xs">
         <Popover // speed
-          opened={speedPopoverOpened} 
+          opened={speedPopoverOpened}
           onChange={setSpeedPopoverOpened}
           position="top"
           withArrow
         >
           <Popover.Target>
-            <ActionIcon 
-              variant="subtle" 
+            <ActionIcon
+              variant="subtle"
               onClick={() => setSpeedPopoverOpened((o) => !o)}
               title={`Speed: ${playbackRate.toFixed(2)}x`}
             >
@@ -196,14 +228,14 @@ export default function VideoControlStrip() {
         </Popover>
 
         <Popover // volume
-          opened={volumePopoverOpened} 
+          opened={volumePopoverOpened}
           onChange={setVolumePopoverOpened}
           position="top"
           withArrow
         >
           <Popover.Target>
-            <ActionIcon 
-              variant="subtle" 
+            <ActionIcon
+              variant="subtle"
               onClick={() => setVolumePopoverOpened((o) => !o)}
               title={`Volume: ${Math.round(volume * 100)}%`}
             >

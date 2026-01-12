@@ -9,33 +9,38 @@ export default function VideoViewport() {
   const isSeekingRef = useRef(false);
 
   const {
-    videoFile,
-    currentTime,
+    activeVideo,
+    currentRelativeTime,
     isPlaying,
     playbackRate,
     volume,
-    setCurrentTime,
-    setVideoDuration,
+    setRelativeTime,
     setIsPlaying,
+    videos,
   } = useVideo(); // hook into video context
 
   // useEffects to update video element based on context changes
 
-  // update video currentTime when context currentTime changes (from external sources like slider)
+  // update video currentTime when context currentRelativeTime changes (from external sources like slider)
   useEffect(() => {
-    if (videoRef.current && videoFile && Math.abs(videoRef.current.currentTime - currentTime) > 0.5) {
+    if (videoRef.current && activeVideo && Math.abs(videoRef.current.currentTime - currentRelativeTime) > 0.5) {
       isSeekingRef.current = true;
-      videoRef.current.currentTime = currentTime;
+      videoRef.current.currentTime = currentRelativeTime;
       // reset flag after seek completes
       setTimeout(() => {
         isSeekingRef.current = false;
       }, 100);
     }
-  }, [currentTime, videoFile]);
+  }, [currentRelativeTime, activeVideo]);
 
   // update playback state
   useEffect(() => {
-    if (!videoRef.current || !videoFile) return;
+    if (!videoRef.current) return;
+
+    if (!activeVideo) {
+      videoRef.current.pause();
+      return;
+    }
 
     if (isPlaying) {
       videoRef.current.play().catch(() => {
@@ -45,7 +50,7 @@ export default function VideoViewport() {
     } else {
       videoRef.current.pause();
     }
-  }, [isPlaying, videoFile, setIsPlaying]);
+  }, [isPlaying, activeVideo, setIsPlaying]);
 
   // update playback rate
   useEffect(() => {
@@ -61,16 +66,18 @@ export default function VideoViewport() {
     }
   }, [volume]);
 
-  const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      setVideoDuration(videoRef.current.duration); // TODO update to handle other metadata if needed
+  const handleTimeUpdate = () => {
+    if (videoRef.current && !isSeekingRef.current) {
+      setRelativeTime(videoRef.current.currentTime);
     }
   };
 
-  const handleTimeUpdate = () => {
-    if (videoRef.current && !isSeekingRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
+  const handlePlay = () => {
+    setIsPlaying(true);
+  };
+
+  const handlePause = () => {
+    setIsPlaying(false);
   };
 
   const handleEnded = () => {
@@ -81,7 +88,7 @@ export default function VideoViewport() {
     console.error('Video failed to load', e);
   };
 
-  if (!videoFile) { // no video loaded, show placeholder text
+  if (!activeVideo) { // no video loaded, show placeholder text
     return (
       <Box
         style={{
@@ -96,9 +103,11 @@ export default function VideoViewport() {
           <Text c="dimmed" fw={500}>
             No video loaded
           </Text>
-          <Text size="sm" c="dimmed">
-            Import a video file to begin
-          </Text>
+          {videos.length === 0 && (
+            <Text size="sm" c="dimmed">
+              Import a video file to begin
+            </Text>
+          )}
         </Stack>
       </Box>
     );
@@ -130,12 +139,13 @@ export default function VideoViewport() {
           objectFit: 'contain',
           display: 'block',
         }}
-        onLoadedMetadata={handleLoadedMetadata}
         onTimeUpdate={handleTimeUpdate}
+        onPlay={handlePlay}
+        onPause={handlePause}
         onEnded={handleEnded}
         onError={handleError}
         // use fileUrl if available, else fallback to file:// path
-        src={videoFile?.fileUrl || (videoFile?.path ? `file://${videoFile.path}` : undefined)}
+        src={activeVideo?.fileUrl || (activeVideo?.path ? `file://${activeVideo.path}` : undefined)}
       />
     </Box>
   );

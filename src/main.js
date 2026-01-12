@@ -3,6 +3,28 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import started from 'electron-squirrel-startup';
 import fs from 'node:fs';
+import ffmpeg from 'fluent-ffmpeg';
+import ffprobeStatic from 'ffprobe-static';
+
+// Resolve ffprobe path for both dev and packaged (asar) builds
+const resolveFfprobePath = () => {
+  const binSuffix = ffprobeStatic.path.split(`${path.sep}bin${path.sep}`).pop();
+
+  const pos_paths = [
+    ffprobeStatic.path, // default
+    path.join(process.cwd(), 'node_modules', 'ffprobe-static', 'bin', binSuffix), // dev cwd
+  ].filter(Boolean);
+
+  for (const p of pos_paths) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+
+  throw new Error(`ffprobe binary not found, tried: ${pos_paths.join(', ')}`);
+};
+
+ffmpeg.setFfprobePath(resolveFfprobePath());
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -38,51 +60,105 @@ const createWindow = () => {
 
 // ipcMain handles messages from renderer process
 
+// get video metadata using ffprobe
+const probeVideo = (filePath) =>
+  new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err) return reject(err);
+      resolve(metadata);
+    });
+  });
+
+const buildVideoMetadata = async (filePath) => {
+  const stats = fs.statSync(filePath); // file status/metadata
+  const fileName = path.basename(filePath);
+  const metadata = await probeVideo(filePath);
+  const format = metadata?.format || {};
+  
+  // get info about video stream, or use empty array if no streams
+  const videoStream = (metadata?.streams || []).find((s) => s.codec_type === 'video');
+  
+  // try to get duration from video stream first, then format, then default to 0
+  const rawDuration = videoStream?.duration || format.duration || 0;
+  const durationSeconds = parseFloat(rawDuration);
+  
+  const creationTag = format.tags?.creation_time;
+  const createdAtDate = creationTag ? new Date(creationTag) : stats.birthtime;
+
+  const startMs = createdAtDate.getTime();
+  const endMs = startMs + durationSeconds * 1000;
+
+  return {
+    path: filePath,
+    fileUrl: pathToFileURL(filePath).toString(),
+    fileName,
+    fileSize: stats.size,
+    createdAt: createdAtDate.toISOString(),
+    durationSeconds,
+    startMs,
+    endMs,
+  };
+};
+
 // IPC handlers for file operations
-ipcMain.handle('select-video', async () => {
+
+ipcMain.handle('get-video-metadata', async (event, filePath) => {
+  try {
+    return await buildVideoMetadata(filePath);
+  } catch (error) {
+    throw new Error(`Failed to read video metadata: ${error.message}`);
+  }
+});
+
+ipcMain.handle('select-video-folder', async () => {
   const result = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    filters: [
-      { name: 'MP4', extensions: ['mp4'] },
-      { name: 'All Files', extensions: ['*'] } // add csv or other types when know input format
-    ]
+    properties: ['openDirectory'],
   });
 
   if (result.canceled) {
     return null;
   }
 
-  const filePath = result.filePaths[0];
+  const folderPath = result.filePaths[0];
+  const folderName = path.basename(folderPath);
+  const folderNamePattern = /^Day.+_\d{8}_\d{6}$/; // match pattern Day1Whale1_20250611_110050
+
+  if (!folderNamePattern.test(folderName)) {
+    throw new Error('Folder name must match "Day..._YYYYMMDD_HHMMSS"');
+  }
+
+  const videoDir = path.join(folderPath, 'video');
+  if (!fs.existsSync(videoDir) || !fs.statSync(videoDir).isDirectory()) {
+    throw new Error('Selected folder must contain a "video" subfolder');
+  }
+
+  const entries = fs.readdirSync(videoDir)
+    .filter((f) => f.toLowerCase().endsWith('.mp4'))
+    .map((f) => path.join(videoDir, f));
+
+  if (entries.length === 0) {
+    throw new Error('No .mp4 files found in the "video" subfolder');
+  }
+
+  const videos = [];
+  for (const filePath of entries) {
+    const meta = await buildVideoMetadata(filePath);
+    videos.push(meta);
+  }
+
+  videos.sort((a, b) => a.startMs - b.startMs);
   
-  // Verify file exists and is an mp4
-  // redundant since import modal also checks, but good for robustness across layers
-  if (!filePath.endsWith('.mp4')) {
-    throw new Error('Selected file must be an .mp4 file');
-  }
+  //get global timeline start/end across all videos
+  const timelineStartMs = Math.min(...videos.map((v) => v.startMs));
+  const timelineEndMs = Math.max(...videos.map((v) => v.endMs));
 
-  if (!fs.existsSync(filePath)) {
-    throw new Error('Selected file does not exist');
-  }
-
-  return filePath;
-});
-
-ipcMain.handle('get-video-metadata', async (event, filePath) => {
-  try {
-    const stats = fs.statSync(filePath);
-    const fileName = path.basename(filePath);
-    
-    // TODO what other metadata to extract?
-    return {
-      path: filePath,
-      fileUrl: pathToFileURL(filePath).toString(),
-      fileName: fileName,
-      fileSize: stats.size,
-      lastModified: stats.mtime,
-    };
-  } catch (error) {
-    throw new Error(`Failed to read video metadata: ${error.message}`);
-  }
+  return {
+    folderName,
+    folderPath,
+    videos,
+    timelineStartMs,
+    timelineEndMs,
+  };
 });
 
 // This method will be called when Electron has finished
