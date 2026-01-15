@@ -9,6 +9,7 @@ import {
     Tooltip,
 } from "@mantine/core";
 import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import AudioDisplay from "./AudioDisplay";
 
 export default function AudioSection({ collapsed, onToggleCollapsed }) {
     const [mode, setMode] = useState("waveform");
@@ -16,56 +17,69 @@ export default function AudioSection({ collapsed, onToggleCollapsed }) {
     return (
         <Paper
             radius="md"
-            p="xs"
+            p={4}
             style={{
                 height: "100%",
-                paddingBottom: 5,
+                paddingTop: 2,
+                paddingBottom: 2,
                 position: "relative",
             }}
         >
-            <Paper withBorder p="xs" radius="md" style={{ height: "100%" }}>
-            <Box
-                style={{
-                    height: "100%",
-                    display: "grid",
-                    gridTemplateRows: collapsed ? "32px" : "32px 1fr",
-                    gap: 2,
-                }}
+            <Paper
+                withBorder
+                p={4}
+                radius="md"
+                style={{ height: "100%", paddingTop: 2, paddingBottom: 2 }}
             >
-                {/* toolbar at the top */}
-                <Group justify="space-between" align="center">
+                <Box
+                    style={{
+                        position: "relative",
+                        height: "100%",
+                        display: "grid",
+                        gridTemplateRows: collapsed ? "32px" : "1fr",
+                        gap: 2,
+                    }}
+                >
                     {!collapsed && (
-                        <SegmentedControl
-                            size="xs"
-                            value={mode}
-                            onChange={setMode}
-                            data={[
-                                { label: "Waveform", value: "waveform" },
-                                { label: "Spectrogram", value: "spectrogram" },
-                            ]}
-                        />
+                        mode === "waveform" ? (
+                            <AudioDisplay />
+                        ) : (
+                            <Box
+                                style={{
+                                    display: "grid",
+                                    placeItems: "center",
+                                }}
+                            >
+                                <Text c="dimmed">Spectrogram placeholder</Text>
+                            </Box>
+                        )
                     )}
-                    {collapsed && <Box />}
-                </Group>
-
-                {!collapsed && ( // display collapses
-                    <Box
-                        style={{
-                            border: "2px dashed #adb5bd",
-                            borderRadius: 10,
-                            display: "grid",
-                            placeItems: "center",
-                        }}
-                    >
-                        <Text c="dimmed">
-                            {mode === "waveform" ? "Waveform" : "Spectrogram"} (placeholder)
-                        </Text>
-                    </Box>
-                )}
-            </Box>
+                </Box>
             </Paper>
 
-            {/* Collapse button overlay */}
+            {/* Controls overlay - segmented control and collapse button */}
+            {!collapsed && (
+                <Group
+                    gap="xs"
+                    style={{
+                        position: "absolute",
+                        top: 7,
+                        right: 40,
+                        zIndex: 11,
+                    }}
+                >
+                    <SegmentedControl
+                        size="xs"
+                        value={mode}
+                        onChange={setMode}
+                        data={[
+                            { label: "Waveform", value: "waveform" },
+                            { label: "Spectrogram", value: "spectrogram" },
+                        ]}
+                    />
+                </Group>
+            )}
+
             <Tooltip label={collapsed ? "Expand audio panel" : "Collapse audio panel"} withArrow>
                 <ActionIcon
                     variant="subtle"

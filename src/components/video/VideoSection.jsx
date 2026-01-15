@@ -6,7 +6,7 @@ import VideoControlStrip from "./VideoControlStrip";
 
 export default function VideoSection() {
     return (
-        <Paper radius="md" p="md" style={{ height: "100%", overflow: "hidden" }}>
+        <Paper radius="md" p="xs" style={{ height: "100%", overflow: "hidden", paddingBottom: 0 }}>
             <Box
                 style={{
                     height: "100%",
